@@ -1,0 +1,193 @@
+# This is a CloudFormation Template to create the DataPipeline job for synching two S3
+# buckets, that can be on two different accounts.
+#
+# For more information, see the README.md file
+
+AWSTemplateFormatVersion: "2010-09-09"
+
+Parameters:
+  SubnetId:
+    Type: String
+  Timeout:
+    Type: String
+
+  CreateLogBucket:
+    Type: String
+    Default: Yes
+  LogBucketName:
+    Type: String
+    Default: s3-bucket-sync-logs
+  InstanceType:
+    Type: String
+    Default: i3.large
+
+Resources:
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: S3BucketSyncSG
+      GroupDescription: S3BucketSyncSG
+      VpcId:
+        Ref: VPC
+      SecurityGroupEgress:
+        - CidrIp: "0.0.0.0/0"
+          IpProtocol: "tcp"
+          FromPort: "0"
+          ToPort: "65535"
+        - CidrIp: "0.0.0.0/0"
+          IpProtocol: "udp"
+          FromPort: "0"
+          ToPort: "65535"
+
+  DataPipielineServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: S3BucketSyncPipelineRole
+      AssumeRolePolicyDocument:
+        xx
+      Policies:
+        - PolicyDocument: JSON
+          PolicyName: String
+
+  DataPipielineResourceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: S3BucketSyncPipelineRole
+      AssumeRolePolicyDocument:
+        xx
+      Policies:
+        - PolicyDocument: JSON
+          PolicyName: String
+
+  Pipeline:
+    Type: AWS::DataPipeline::Pipeline
+    Properties:
+      Activate: Boolean
+      Description: "S3BucketSync - Sync S3 Buckets between accounts"
+      Name: "S3BucketSync"
+      ParameterObjects:
+        - Id: iam_config
+          Attributes:
+            - Key: type
+              StringValue: string
+        - Id: source_bucket
+          Attributes:
+            - Key: type
+              StringValue: string
+        - Id: target_bucket
+          Attributes:
+            - Key: type
+              StringValue: string
+        - Id: source_path
+          Attributes:
+            - Key: type
+              StringValue: string
+            - Key: default
+              StringValue: ""
+        - Id: target_path
+          Attributes:
+            - Key: type
+              StringValue: string
+            - Key: default
+              StringValue: ""
+        - Id: source_key
+          Attributes:
+            - Key: type
+              StringValue: string
+            - Key: default
+              StringValue: ""
+        - Id: source_secret
+          Attributes:
+            - Key: type
+              StringValue: string
+            - Key: default
+              StringValue: ""
+        - Id: target_key
+          Attributes:
+            - Key: type
+              StringValue: string
+            - Key: default
+              StringValue: ""
+        - Id: target_secret
+          Attributes:
+            - Key: type
+              StringValue: string
+            - Key: default
+              StringValue: ""
+      PipelineObjects:
+        - Id: "Default"
+          Name: "Default"
+          Fields:
+            - Key: "type"
+              tringValue: "Default"
+            - Key: "scheduleType"
+              StringValue: "ondemand"
+            - Key: "failureAndRerunMode"
+              StringValue: "CASCADE"
+            - Key: "role"
+              StringValue:
+                Ref: DataPipielineServiceRole
+            - Key: "resourceRole"
+              StringValue:
+                Ref: DataPipielineResourceRole
+            - Key: "pipelineLogUri"
+              StringValue:
+                Ref: LogBucket
+        - Id: "EC2ResourceObj"
+          Name: "EC2ResourceObj"
+          Fields:
+            - Key: "type"
+              StringValue: "Ec2Resource"
+            - Key: "instanceType"
+              StringValue:
+                Ref: InstanceType
+            - Key: "securityGroupIds"
+              StringValue:
+                Ref: SecurityGroup
+            - Key: "subnetId"
+              StringValue:
+                Ref: SubnetId
+            - Key: "associatePublicIpAddress"
+              StringValue: "true"
+            - Key: "terminateAfter"
+              StringValue:
+                Fn::Join:
+                  - " "
+                  - - !Ref: Timeout
+                    - "Minutes"
+            - Key: "actionOnTaskFailure"
+              StringValue: "terminate"
+            - Key: "actionOnResourceFailure"
+              StringValue: "terminate"
+        - Id: "ShellCommandActivityObj"
+          Name: "ShellCommandActivityObj"
+          Fields:
+            - Key: "type"
+              StringValue: "ShellCommandActivity"
+            - Key: "command"
+              StringValue: "/s3sync.sh"
+            - Key: "scriptArgument"
+              StringValue: "#{iam_config}"
+            - Key: "scriptArgument"
+              StringValue: "#{source_bucket}"
+            - Key: "scriptArgument"
+              StringValue: "#{target_bucket}"
+            - Key: "scriptArgument"
+              StringValue: "#{disks}"
+            - Key: "scriptArgument"
+              StringValue: "#{source_path}"
+            - Key: "scriptArgument"
+              StringValue: "#{target_path}"
+            - Key: "scriptArgument"
+              StringValue: "#{source_key}"
+            - Key: "scriptArgument"
+              StringValue: "#{source_secret}"
+            - Key: "scriptArgument"
+              StringValue: "#{target_key}"
+            - Key: "scriptArgument"
+              StringValue: "#{target_secret}"
+            - Key: "runsOn"
+              RefValue: "EC2ResourceObj"
+      PipelineTags:
+        - Key: Name
+          Value: S3BucketSync
